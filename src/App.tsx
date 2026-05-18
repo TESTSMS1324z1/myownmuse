@@ -21,7 +21,8 @@ import {
   ChevronLeft,
   X,
   Plus,
-  ArrowUpRight
+  ArrowUpRight,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -75,6 +76,15 @@ const INITIAL_PLAYLIST: Track[] = [
     url: "https://ldosa9402.github.io/hooyeah123.github.io/music/沉溺.m4a",
     duration: "03:13",
     lyrics: "none"
+  },
+  {
+    id: 3,
+    title: "Beauty And A Beat",
+    artist: "Justin Bieber",
+    cover: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/73/08/1a/73081a96-0f7c-b5f8-2757-5c17fb714323/12UMGIM31899.rgb.jpg/300x300bb.webp",
+    url: "https://ldosa9402.github.io/hooyeah123.github.io/music/Beauty%20And%20A%20Beat%20feat%20Nicki%20Minaj-Justin%20Bieber.m4a",
+    duration: "03:48",
+    lyrics: "none"
   }
 ];
 
@@ -106,6 +116,7 @@ export default function App() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [likedTracks, setLikedTracks] = useState<Set<number>>(new Set());
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -359,9 +370,37 @@ export default function App() {
                 </div>
               </div>
 
+              <div className="px-6 py-4 flex flex-col gap-4">
+                <div className="relative group">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim group-focus-within:text-accent transition-colors" />
+                  <input 
+                    type="text"
+                    placeholder="Search music..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-black/20 border border-white/5 rounded-full py-2 pl-9 pr-4 text-[11px] outline-none focus:border-accent/30 focus:bg-black/40 transition-all placeholder:text-text-dim/50"
+                  />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-text-dim hover:text-white"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto pt-2 space-y-1">
                 {folders.map((folder) => {
-                  const isExpanded = expandedFolders.has(folder.id);
+                  const filteredTracks = folder.tracks.filter(track => 
+                    track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    track.artist.toLowerCase().includes(searchQuery.toLowerCase())
+                  );
+
+                  if (searchQuery && filteredTracks.length === 0) return null;
+
+                  const isExpanded = expandedFolders.has(folder.id) || !!searchQuery;
                   return (
                     <div key={folder.id} className="space-y-0.5">
                       {/* Folder Header */}
@@ -395,7 +434,7 @@ export default function App() {
                             exit={{ height: 0, opacity: 0 }}
                             className="overflow-hidden bg-black/10"
                           >
-                            {folder.tracks.map((track) => {
+                            {filteredTracks.map((track) => {
                               const isActive = currentTrack && currentTrack.id === track.id && currentPlaylist.some(t => t.id === track.id);
                               return (
                                 <div
