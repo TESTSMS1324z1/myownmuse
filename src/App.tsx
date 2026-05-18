@@ -66,6 +66,15 @@ const INITIAL_PLAYLIST: Track[] = [
     url: "https://ldosa9402.github.io/music/愛你但說不出口.mp3",
     duration: "02:59",
     lyrics: "none"
+  },
+  {
+    id: 2,
+    title: "沉溺",
+    artist: "鄒沛沛、Pank",
+    cover: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/04/95/ef/0495ef40-2ad6-05a4-ec2f-5d7ed45adf0f/23UMGIM28880.rgb.jpg/592x592bb.webp",
+    url: "https://ldosa9402.github.io/hooyeah123.github.io/music/沉溺.m4a",
+    duration: "03:13",
+    lyrics: "none"
   }
 ];
 
