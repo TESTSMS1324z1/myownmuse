@@ -16,10 +16,12 @@ import {
   ListMusic, 
   Music2, 
   Heart,
+  MoreHorizontal,
   ChevronRight,
   ChevronLeft,
   X,
-  Plus
+  Plus,
+  ArrowUpRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -110,6 +112,7 @@ const INITIAL_FOLDERS: Folder[] = [
 export default function App() {
   const [folders, setFolders] = useState<Folder[]>(INITIAL_FOLDERS);
   const [currentPlaylist, setCurrentPlaylist] = useState<Track[]>(INITIAL_PLAYLIST);
+  const [currentPlaylistName, setCurrentPlaylistName] = useState('All Tracks');
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -121,11 +124,23 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showAddTrack, setShowAddTrack] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['f1', 'f2']));
+  const [showQueue, setShowQueue] = useState(false);
+  const [queue, setQueue] = useState<Track[]>([]);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [likedTracks, setLikedTracks] = useState<Set<number>>(new Set());
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const currentTrack = currentPlaylist[currentTrackIndex];
+
+  const toggleLike = (id: number) => {
+    setLikedTracks(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Handle Playback
   const togglePlay = () => {
@@ -139,9 +154,10 @@ export default function App() {
     }
   };
 
-  const playTrack = (track: Track, fromPlaylist: Track[]) => {
+  const playTrack = (track: Track, fromPlaylist: Track[], playlistName: string = 'Playlist') => {
     const index = fromPlaylist.findIndex(t => t.id === track.id);
     setCurrentPlaylist(fromPlaylist);
+    setCurrentPlaylistName(playlistName);
     setCurrentTrackIndex(index !== -1 ? index : 0);
     setIsPlaying(true);
   };
@@ -149,12 +165,40 @@ export default function App() {
   const playFolder = (folder: Folder) => {
     if (folder.tracks.length > 0) {
       setCurrentPlaylist(folder.tracks);
+      setCurrentPlaylistName(folder.name);
       setCurrentTrackIndex(0);
       setIsPlaying(true);
     }
   };
 
+  const addToQueue = (track: Track) => {
+    setQueue(prev => [...prev, track]);
+  };
+
+  const removeFromQueue = (index: number) => {
+    setQueue(prev => prev.filter((_, i) => i !== index));
+  };
+
   const nextTrack = useCallback(() => {
+    if (queue.length > 0) {
+      const nextFromQueue = queue[0];
+      setQueue(prev => prev.slice(1));
+      
+      // We need to find if this track exists in current playlist or not
+      // If not, we might need to handle it. For now, let's just update currentTrackIndex if possible
+      const indexInPlaylist = currentPlaylist.findIndex(t => t.id === nextFromQueue.id);
+      if (indexInPlaylist !== -1) {
+        setCurrentTrackIndex(indexInPlaylist);
+      } else {
+        // If it's a completely new track (e.g. from a different folder), 
+        // we prepend it to current playlist or just play it as a one-off
+        setCurrentPlaylist(prev => [nextFromQueue, ...prev]);
+        setCurrentTrackIndex(0);
+      }
+      setIsPlaying(true);
+      return;
+    }
+
     let nextIndex;
     if (isShuffle) {
       nextIndex = Math.floor(Math.random() * currentPlaylist.length);
@@ -163,7 +207,7 @@ export default function App() {
     }
     setCurrentTrackIndex(nextIndex);
     setIsPlaying(true);
-  }, [currentTrackIndex, isShuffle, currentPlaylist.length]);
+  }, [currentTrackIndex, isShuffle, currentPlaylist, queue]);
 
   const prevTrack = () => {
     let prevIndex = (currentTrackIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
@@ -266,32 +310,57 @@ export default function App() {
       />
 
       {/* Top Navigation Bar */}
-      <nav className="h-16 border-b border-border-dim flex justify-between items-center px-6 z-50 bg-bg shrink-0">
+      <nav className="h-16 border-b border-border-dim flex justify-between items-center px-4 md:px-6 z-50 bg-bg shrink-0">
         <div className="text-xl font-bold tracking-[0.2em] text-accent uppercase">MUSE</div>
-        <div className="flex gap-8 text-[11px] font-semibold uppercase tracking-widest text-text-dim items-center">
+        <div className="hidden md:flex gap-8 text-[11px] font-semibold uppercase tracking-widest text-text-dim items-center">
           <span className="cursor-pointer hover:text-white transition-colors text-white">Collection</span>
         </div>
-        <div className="text-[11px] font-mono text-text-dim tabular-nums">USER_2026</div>
+        <div className="text-[10px] md:text-[11px] font-mono text-text-dim tabular-nums">USER_2026</div>
       </nav>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Sidebar - Playlist */}
+        {/* Immersive Background */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          <motion.img 
+            key={currentTrack.cover}
+            src={currentTrack.cover} 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.15 }}
+            transition={{ duration: 1 }}
+            className="w-full h-full object-cover scale-110 blur-3xl"
+            alt=""
+          />
+          <div className="absolute inset-0 bg-black/40" />
+        </div>
+
+        {/* Sidebar - Playlist (Drawer on Mobile) */}
         <AnimatePresence mode="wait">
           {isSidebarOpen && (
             <motion.aside 
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 280, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              className="h-full bg-surface border-r border-border-dim flex flex-col shrink-0 overflow-hidden"
+              initial={{ x: -100, opacity: 0 }}
+              animate={{ x: 0, opacity: 1, width: window.innerWidth < 768 ? '100%' : 280 }}
+              exit={{ x: -100, opacity: 0, width: 0 }}
+              className={`h-full bg-surface border-r border-border-dim flex flex-col shrink-0 overflow-hidden z-40 ${
+                window.innerWidth < 768 ? 'absolute inset-0' : 'relative'
+              }`}
             >
               <div className="p-6 border-b border-border-dim flex justify-between items-center h-16 shrink-0">
                 <span className="text-[11px] text-text-dim uppercase tracking-[0.15em]">Your Library</span>
-                <button 
-                  onClick={() => setShowAddTrack(true)}
-                  className="p-1 hover:bg-white/10 rounded transition-colors"
-                >
-                  <Plus size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setShowAddTrack(true)}
+                    className="p-1.5 hover:bg-white/10 rounded transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                  {/* Close button for mobile sidebar */}
+                  <button 
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="md:hidden p-1.5 hover:bg-white/10 rounded transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto pt-2 space-y-1">
@@ -333,10 +402,10 @@ export default function App() {
                             {folder.tracks.map((track) => {
                               const isActive = currentTrack.id === track.id && currentPlaylist.some(t => t.id === track.id);
                               return (
-                                <button
+                                <div
                                   key={track.id}
-                                  onClick={() => playTrack(track, folder.tracks)}
-                                  className={`w-full flex items-center gap-4 px-8 py-3 transition-all relative group ${
+                                  onClick={() => playTrack(track, folder.tracks, folder.name)}
+                                  className={`w-full flex items-center gap-4 px-8 py-3 transition-all relative group cursor-pointer ${
                                     isActive ? 'bg-white/10 border-l-4 border-accent' : 'hover:bg-white/5 border-l-4 border-transparent'
                                   }`}
                                 >
@@ -359,8 +428,17 @@ export default function App() {
                                     <div className="text-[10px] text-text-dim truncate">{track.artist}</div>
                                   </div>
                                   <div className="text-[10px] text-text-dim tabular-nums group-hover:hidden">{track.duration}</div>
-                                  <div className="hidden group-hover:block"><Play size={10} className="text-accent" /></div>
-                                </button>
+                                  <div className="hidden group-hover:flex items-center gap-2">
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); addToQueue(track); }}
+                                      className="p-1 hover:text-accent transition-colors"
+                                      title="Add to Queue"
+                                    >
+                                      <ArrowUpRight size={14} />
+                                    </button>
+                                    <Play size={10} className="text-accent" />
+                                  </div>
+                                </div>
                               );
                             })}
                           </motion.div>
@@ -375,41 +453,138 @@ export default function App() {
         </AnimatePresence>
 
         {/* Player View */}
-        <main className="flex-1 relative flex flex-col items-center justify-center p-8 bg-[radial-gradient(circle_at_center,_#1a1a1a_0%,_#0a0a0a_100%)]">
+        <main className="flex-1 relative flex flex-col items-center justify-start md:justify-center p-6 md:p-8 overflow-y-auto z-10 transition-all duration-500 custom-scrollbar">
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="absolute top-6 left-6 p-2 rounded-full hover:bg-white/10 transition-colors text-text-dim hover:text-white z-40"
+            className="absolute top-6 left-6 p-2 rounded-full hover:bg-white/10 transition-colors text-text-dim hover:text-white z-30"
           >
-            {isSidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+            {isSidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
           </button>
 
-          <div className="w-full max-w-2xl flex flex-col items-center gap-16">
-            {/* Vinyl Record */}
-            <div className="relative group">
-              <div 
-                className={`w-[240px] h-[240px] md:w-[320px] md:h-[320px] rounded-full bg-black border-[12px] border-[#1a1a1a] shadow-[0_40px_100px_rgba(0,0,0,0.8)] relative flex items-center justify-center transition-transform duration-700 ${
-                  isPlaying ? 'animate-rotate' : 'pause-animation'
-                }`}
-              >
-                {/* Vinyl Texture Lines */}
-                <div className="absolute inset-0 rounded-full border border-white/5" />
-                <div className="absolute inset-[10%] rounded-full border border-white/5" />
-                <div className="absolute inset-[20%] rounded-full border border-white/5" />
-                
-                {/* Album Cover Circle */}
-                <div className="w-[140px] h-[140px] rounded-full overflow-hidden border-[4px] border-[#111] z-10 shrink-0">
-                  <img src={currentTrack.cover} alt="" className="w-full h-full object-cover" />
-                </div>
-                
-                {/* Central Hole */}
-                <div className="absolute w-6 h-6 rounded-full bg-bg z-20 border border-white/10" />
-              </div>
-            </div>
+          <div className="w-full max-w-xl flex flex-col items-center gap-4 md:gap-12 mt-4 md:mt-0 flex-1 justify-center min-h-fit pb-12 md:pb-0">
+            {/* Album Art - smaller on mobile to fit controls */}
+            <motion.div 
+              key={currentTrack.id}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', damping: 20 }}
+              className="relative shadow-[0_40px_80px_rgba(0,0,0,0.6)] rounded-xl overflow-hidden aspect-square w-full max-w-[220px] sm:max-w-[280px] md:max-w-md group shrink-0"
+            >
+              <img src={currentTrack.cover} alt="" className="w-full h-full object-cover" />
+            </motion.div>
 
-            {/* Track Metadata */}
-            <div className="text-center space-y-3">
-              <h2 className="text-3xl md:text-5xl font-light text-white tracking-wide">{currentTrack.title}</h2>
-              <p className="text-base text-text-dim uppercase tracking-[0.2em]">{currentTrack.artist} — Album</p>
+            {/* Track Info & Actions (Mobile style) */}
+            <div className="w-full max-w-[320px] md:max-w-md flex flex-col items-center md:items-center space-y-3">
+              <div className="w-full flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl md:text-3xl font-bold text-white truncate tracking-tight">{currentTrack.title}</h2>
+                  <p className="text-sm md:text-base text-text-dim/80 font-medium truncate mt-0.5">
+                    {currentTrack.artist}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button 
+                    onClick={() => toggleLike(currentTrack.id)}
+                    className={`p-2 border border-white/5 bg-white/5 rounded-full hover:bg-white/15 transition-all ${
+                      likedTracks.has(currentTrack.id) ? 'text-accent' : 'text-text-dim'
+                    }`}
+                  >
+                    <Heart size={18} fill={likedTracks.has(currentTrack.id) ? 'currentColor' : 'none'} />
+                  </button>
+                  <button className="p-2 border border-white/5 bg-white/5 rounded-full hover:bg-white/15 transition-all text-text-dim hover:text-white">
+                    <MoreHorizontal size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress & Controls - Mobile Specific */}
+              <div className="w-full md:hidden flex flex-col gap-4">
+                {/* Progress */}
+                <div className="space-y-1">
+                  <div className="relative w-full group py-1.5">
+                    <input 
+                      type="range" min="0" max={duration || 0} step="0.1" value={currentTime}
+                      onChange={handleSeek}
+                      className="w-full relative z-10 opacity-0 cursor-pointer h-1.5"
+                    />
+                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 bg-white/10 rounded-full" />
+                    <div 
+                      className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 bg-white/80 rounded-full"
+                      style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] font-mono text-text-dim tabular-nums px-1">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>-{formatTime(duration - currentTime)}</span>
+                  </div>
+                </div>
+
+                {/* Playback Controls */}
+                <div className="flex items-center justify-between px-4">
+                  <button onClick={prevTrack} className="text-white hover:opacity-70 transition-opacity">
+                    <SkipBack size={36} fill="currentColor" />
+                  </button>
+                  <button 
+                    onClick={togglePlay}
+                    className="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl"
+                  >
+                    {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+                  </button>
+                  <button onClick={nextTrack} className="text-white hover:opacity-70 transition-opacity">
+                    <SkipForward size={36} fill="currentColor" />
+                  </button>
+                </div>
+
+                {/* Secondary Controls - Shuffle/Repeat/Volume */}
+                <div className="flex flex-col gap-5 pt-1">
+                  <div className="flex items-center gap-4 px-2">
+                    <VolumeX size={14} className="text-text-dim" />
+                    <div className="flex-1 relative h-4 flex items-center">
+                      <input 
+                        type="range" min="0" max="1" step="0.01" 
+                        value={isMuted ? 0 : volume}
+                        onChange={(e) => setVolume(parseFloat(e.target.value))}
+                        className="w-full opacity-0 cursor-pointer relative z-10"
+                      />
+                      <div className="absolute inset-x-0 h-1 bg-white/10 rounded-full" />
+                      <div 
+                        className="absolute left-0 h-1 bg-white/50 rounded-full"
+                        style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
+                      />
+                    </div>
+                    <Volume2 size={14} className="text-text-dim" />
+                  </div>
+
+                  {/* Icon Actions */}
+                  <div className="flex justify-between items-center px-4">
+                    <button 
+                      onClick={() => setIsShuffle(!isShuffle)}
+                      className={`${isShuffle ? 'text-accent' : 'text-text-dim'} transition-colors`}
+                    >
+                      <Shuffle size={18} />
+                    </button>
+                    <button 
+                      onClick={() => { setShowLyrics(!showLyrics); setShowQueue(false); }}
+                      className={`${showLyrics ? 'text-accent' : 'text-text-dim'} transition-colors`}
+                    >
+                      <Music2 size={20} />
+                    </button>
+                    <button 
+                      onClick={() => { setShowQueue(!showQueue); setShowLyrics(false); }}
+                      className={`${showQueue ? 'text-accent' : 'text-text-dim'} transition-colors relative`}
+                    >
+                      <ListMusic size={20} />
+                      {queue.length > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-accent rounded-full" />}
+                    </button>
+                    <button 
+                      onClick={() => setRepeatMode(repeatMode === 'all' ? 'one' : repeatMode === 'one' ? 'none' : 'all')}
+                      className={`${repeatMode !== 'none' ? 'text-accent' : 'text-text-dim'} transition-colors`}
+                    >
+                      <Repeat size={18} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -437,30 +612,129 @@ export default function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Queue Overlay */}
+          <AnimatePresence>
+            {showQueue && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="absolute inset-0 z-30 bg-bg/95 backdrop-blur-2xl flex flex-col p-6 md:p-8"
+              >
+                <div className="flex justify-between items-center mb-6 md:mb-8">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-bold uppercase tracking-[0.3em] text-accent/80 italic">Current Sequence</h3>
+                    <p className="text-[10px] text-text-dim uppercase tracking-widest">Upcoming tracks</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowQueue(false)}
+                    className="p-2 text-text-dim hover:text-white transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto space-y-8 max-w-2xl mx-auto w-full px-2 custom-scrollbar">
+                  {/* Manual Queue */}
+                  {queue.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-bold text-accent/60 uppercase tracking-[0.2em] px-2 mb-2">Next in Queue</h4>
+                      {queue.map((track, idx) => (
+                        <div 
+                          key={`queue-${track.id}-${idx}`}
+                          className="group flex items-center gap-4 bg-white/5 p-3 rounded-lg hover:bg-white/10 transition-all border border-white/5"
+                        >
+                          <div className="w-10 h-10 rounded overflow-hidden shrink-0">
+                            <img src={track.cover} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{track.title}</p>
+                            <p className="text-xs text-text-dim truncate">{track.artist}</p>
+                          </div>
+                          <button 
+                            onClick={() => removeFromQueue(idx)}
+                            className="p-2 text-text-dim hover:text-accent transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Up Next From Playlist */}
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-text-dim uppercase tracking-[0.2em] px-2 mb-2">
+                      Next from <span className="text-white/40">{currentPlaylistName}</span>
+                    </h4>
+                    {currentPlaylist.length > 1 ? (
+                      currentPlaylist
+                        .map((track, index) => ({ track, index }))
+                        .filter(({ index }) => index !== currentTrackIndex) // Show all other tracks
+                        // Or just show upcoming? Let's show upcoming for clarity
+                        .filter(({ index }) => index > currentTrackIndex)
+                        .map(({ track, index }) => (
+                          <div 
+                            key={`playlist-${track.id}-${index}`}
+                            onClick={() => {
+                              setCurrentTrackIndex(index);
+                              setIsPlaying(true);
+                            }}
+                            className="group flex items-center gap-4 bg-white/3 p-3 rounded-lg hover:bg-white/10 transition-all border border-white/5 cursor-pointer"
+                          >
+                            <div className="w-10 h-10 rounded overflow-hidden shrink-0 opacity-80 group-hover:opacity-100">
+                              <img src={track.cover} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white/70 group-hover:text-white truncate">{track.title}</p>
+                              <p className="text-xs text-text-dim truncate">{track.artist}</p>
+                            </div>
+                            <div className="text-[10px] text-text-dim tabular-nums group-hover:hidden pr-2">{track.duration}</div>
+                            <div className="hidden group-hover:block pr-2">
+                              <Play size={12} className="text-accent" />
+                            </div>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="text-[11px] text-text-dim px-4 italic">No upcoming tracks in playlist</p>
+                    )}
+                    
+                    {queue.length === 0 && currentPlaylist.length <= (currentTrackIndex + 1) && (
+                       <div className="py-12 flex flex-col items-center justify-center text-text-dim opacity-50 space-y-4">
+                        <ListMusic size={48} strokeWidth={1} />
+                        <p className="text-[10px] uppercase tracking-widest font-bold">End of sequence</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
       </div>
 
       {/* Bottom Control Bar */}
-      <footer className="h-24 border-t border-border-dim bg-bg flex items-center px-6 gap-10 shrink-0 z-50">
-        <div className="flex items-center gap-6 shrink-0">
-          <button onClick={prevTrack} className="text-text-dim hover:text-white transition-colors">
+      <footer className="hidden md:flex h-24 border-t border-border-dim bg-bg items-center px-6 md:px-8 gap-4 md:gap-12 shrink-0 z-50">
+        <div className="flex items-center gap-4 md:gap-8 shrink-0">
+          <button onClick={prevTrack} className="text-text-dim hover:text-white transition-colors p-1 md:p-0">
             <SkipBack size={20} fill="currentColor" />
           </button>
           <button 
             onClick={togglePlay}
-            className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-all shadow-xl"
+            className="w-10 h-10 md:w-14 md:h-14 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-all shadow-xl"
           >
-            {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+            {isPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" className="ml-1" />}
           </button>
-          <button onClick={nextTrack} className="text-text-dim hover:text-white transition-colors">
+          <button onClick={nextTrack} className="text-text-dim hover:text-white transition-colors p-1 md:p-0">
             <SkipForward size={20} fill="currentColor" />
           </button>
         </div>
 
         {/* Progress Section */}
-        <div className="flex-1 flex items-center gap-4 text-[11px] font-mono text-text-dim">
-          <span className="w-10 text-right tabular-nums">{formatTime(currentTime)}</span>
-          <div className="relative flex-1 group">
+        <div className="flex-1 flex items-center gap-4 md:gap-6 text-[10px] md:text-[11px] font-mono text-text-dim">
+          <span className="hidden sm:inline w-12 text-right tabular-nums">{formatTime(currentTime)}</span>
+          <div className="relative flex-1 group py-4">
             <input 
               type="range" 
               min="0" 
@@ -481,34 +755,48 @@ export default function App() {
               style={{ left: `${(currentTime / (duration || 1)) * 100}%`, transform: 'translate(-50%, -50%)' }}
             />
           </div>
-          <span className="w-10 tabular-nums">{formatTime(duration)}</span>
+          <span className="hidden sm:inline w-10 tabular-nums">{formatTime(duration)}</span>
         </div>
 
         {/* Secondary Controls & Volume */}
-        <div className="flex items-center gap-6 shrink-0">
-          <div className="flex gap-4 text-text-dim mr-4 border-r border-border-dim pr-6">
+        <div className="flex items-center gap-4 md:gap-10 shrink-0">
+          <div className="flex gap-3 md:gap-6 text-text-dim md:mr-4 md:border-r border-border-dim md:pr-10">
             <button 
-              onClick={() => setShowLyrics(!showLyrics)}
-              className={showLyrics ? 'text-accent' : 'hover:text-white'}
+              onClick={() => { setShowQueue(!showQueue); setShowLyrics(false); }}
+              className={`${showQueue ? 'text-accent' : 'hover:text-white'} p-1 transition-colors`}
+              title="Queue"
+            >
+              <div className="relative">
+                <ListMusic size={18} />
+                {queue.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-accent text-bg text-[8px] font-bold rounded-full flex items-center justify-center">
+                    {queue.length}
+                  </span>
+                )}
+              </div>
+            </button>
+            <button 
+              onClick={() => { setShowLyrics(!showLyrics); setShowQueue(false); }}
+              className={`${showLyrics ? 'text-accent' : 'hover:text-white'} p-1 transition-colors`}
               title="Lyrics"
             >
               <Music2 size={18} />
             </button>
             <button 
               onClick={() => setIsShuffle(!isShuffle)}
-              className={isShuffle ? 'text-accent' : 'hover:text-white'}
+              className={`${isShuffle ? 'text-accent' : 'hover:text-white'} p-1 transition-colors`}
             >
-              <Shuffle size={16} />
+              <Shuffle size={18} />
             </button>
             <button 
               onClick={() => setRepeatMode(repeatMode === 'all' ? 'one' : repeatMode === 'one' ? 'none' : 'all')}
-              className={repeatMode !== 'none' ? 'text-accent' : 'hover:text-white'}
+              className={`${repeatMode !== 'none' ? 'text-accent' : 'hover:text-white'} p-1 transition-colors`}
             >
-              <Repeat size={16} />
+              <Repeat size={18} />
             </button>
           </div>
           
-          <div className="flex items-center gap-3 w-32 border-l border-border-dim pl-6 hidden md:flex">
+          <div className="hidden lg:flex items-center gap-3 w-32 border-l border-border-dim pl-6">
             <button onClick={() => setIsMuted(!isMuted)} className="text-text-dim hover:text-white">
               {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
