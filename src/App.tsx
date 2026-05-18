@@ -82,7 +82,7 @@ const INITIAL_PLAYLIST: Track[] = [
     title: "Beauty And A Beat",
     artist: "Justin Bieber",
     cover: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/73/08/1a/73081a96-0f7c-b5f8-2757-5c17fb714323/12UMGIM31899.rgb.jpg/300x300bb.webp",
-    url: "https://ldosa9402.github.io/hooyeah123.github.io/music/Beauty%20And%20A%20Beat%20feat%20Nicki%20Minaj-Justin%20Bieber.m4a",
+    url: "https://ldosa9402.github.io/hooyeah123.github.io/music/Beauty_And_A_Beat.m4a",
     duration: "03:48",
     lyrics: "none"
   }
