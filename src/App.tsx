@@ -46,6 +46,13 @@ interface Track {
   cover: string;
   url: string;
   duration: string;
+  lyrics?: string;
+}
+
+interface Folder {
+  id: string;
+  name: string;
+  tracks: Track[];
 }
 
 const INITIAL_PLAYLIST: Track[] = [
@@ -55,7 +62,8 @@ const INITIAL_PLAYLIST: Track[] = [
     artist: "FASSounds",
     cover: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&q=80&w=400",
     url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    duration: "06:12"
+    duration: "06:12",
+    lyrics: "In the quiet of the night\nSoft beats begin to play\nFocus drifting like the light\nAt the end of every day\n\nStudy sessions in the dark\nLo-fi dreams and coffee steam\nFinding hope within a spark\nLife is more than just a dream"
   },
   {
     id: 2,
@@ -63,7 +71,8 @@ const INITIAL_PLAYLIST: Track[] = [
     artist: "Coma-Media",
     cover: "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=400",
     url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    duration: "07:05"
+    duration: "07:05",
+    lyrics: "Deep bass, steady heart\nMoving through the neon haze\nWhere the rhythm finds its part\nLost within the rhythmic maze\n\nHouse beats, soul release\nDancing on the edge of time\nSearching for that inner peace\nIn this simple, techy rhyme"
   },
   {
     id: 3,
@@ -71,7 +80,8 @@ const INITIAL_PLAYLIST: Track[] = [
     artist: "80s Vibe",
     cover: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?auto=format&fit=crop&q=80&w=400",
     url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    duration: "05:40"
+    duration: "05:40",
+    lyrics: "Neon signs are blinking bright\nSynthesizers start to cry\nRacing through the city light\nUnderneath the purple sky\n\n80s echo in our ears\nLeather jackets, classic cars\nWashing away all our fears\nDancing underneath the stars"
   },
   {
     id: 4,
@@ -79,12 +89,27 @@ const INITIAL_PLAYLIST: Track[] = [
     artist: "Ambient Explorer",
     cover: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&q=80&w=400",
     url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-    duration: "08:22"
+    duration: "08:22",
+    lyrics: "[Instrumental / Nature Sounds]\n\nThe wind whispers through the trees\nWater cascading down the stones\nEverything at perfect ease\nDeep within the forest zones"
+  }
+];
+
+const INITIAL_FOLDERS: Folder[] = [
+  {
+    id: 'f1',
+    name: 'Chill & Study',
+    tracks: INITIAL_PLAYLIST.slice(0, 2)
+  },
+  {
+    id: 'f2',
+    name: 'Night Vibes',
+    tracks: INITIAL_PLAYLIST.slice(2)
   }
 ];
 
 export default function App() {
-  const [playlist, setPlaylist] = useState<Track[]>(INITIAL_PLAYLIST);
+  const [folders, setFolders] = useState<Folder[]>(INITIAL_FOLDERS);
+  const [currentPlaylist, setCurrentPlaylist] = useState<Track[]>(INITIAL_PLAYLIST);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -95,10 +120,12 @@ export default function App() {
   const [repeatMode, setRepeatMode] = useState<'none' | 'one' | 'all'>('all');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showAddTrack, setShowAddTrack] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['f1', 'f2']));
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const currentTrack = playlist[currentTrackIndex];
+  const currentTrack = currentPlaylist[currentTrackIndex];
 
   // Handle Playback
   const togglePlay = () => {
@@ -112,24 +139,36 @@ export default function App() {
     }
   };
 
-  const playTrack = (index: number) => {
-    setCurrentTrackIndex(index);
+  const playTrack = (track: Track, fromPlaylist: Track[]) => {
+    const index = fromPlaylist.findIndex(t => t.id === track.id);
+    setCurrentPlaylist(fromPlaylist);
+    setCurrentTrackIndex(index !== -1 ? index : 0);
     setIsPlaying(true);
+  };
+
+  const playFolder = (folder: Folder) => {
+    if (folder.tracks.length > 0) {
+      setCurrentPlaylist(folder.tracks);
+      setCurrentTrackIndex(0);
+      setIsPlaying(true);
+    }
   };
 
   const nextTrack = useCallback(() => {
     let nextIndex;
     if (isShuffle) {
-      nextIndex = Math.floor(Math.random() * playlist.length);
+      nextIndex = Math.floor(Math.random() * currentPlaylist.length);
     } else {
-      nextIndex = (currentTrackIndex + 1) % playlist.length;
+      nextIndex = (currentTrackIndex + 1) % currentPlaylist.length;
     }
-    playTrack(nextIndex);
-  }, [currentTrackIndex, isShuffle, playlist.length]);
+    setCurrentTrackIndex(nextIndex);
+    setIsPlaying(true);
+  }, [currentTrackIndex, isShuffle, currentPlaylist.length]);
 
   const prevTrack = () => {
-    let prevIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
-    playTrack(prevIndex);
+    let prevIndex = (currentTrackIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
+    setCurrentTrackIndex(prevIndex);
+    setIsPlaying(true);
   };
 
   useEffect(() => {
@@ -142,7 +181,7 @@ export default function App() {
     if (audioRef.current && isPlaying) {
       audioRef.current.play().catch(() => setIsPlaying(false));
     }
-  }, [currentTrackIndex]);
+  }, [currentTrack.id, currentPlaylist]);
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -184,6 +223,15 @@ export default function App() {
     }
   };
 
+  const toggleFolder = (id: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const addNewTrack = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -193,10 +241,16 @@ export default function App() {
       artist: formData.get('artist') as string,
       cover: (formData.get('cover') as string) || "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400",
       url: formData.get('url') as string,
-      duration: "--:--"
+      duration: "--:--",
+      lyrics: (formData.get('lyrics') as string) || ""
     };
     if (newTrack.title && newTrack.url) {
-      setPlaylist([...playlist, newTrack]);
+      // Add to default folder for now
+      setFolders(prev => {
+        const next = [...prev];
+        next[0].tracks = [...next[0].tracks, newTrack];
+        return next;
+      });
       setShowAddTrack(false);
     }
   };
@@ -215,9 +269,7 @@ export default function App() {
       <nav className="h-16 border-b border-border-dim flex justify-between items-center px-6 z-50 bg-bg shrink-0">
         <div className="text-xl font-bold tracking-[0.2em] text-accent uppercase">MUSE</div>
         <div className="flex gap-8 text-[11px] font-semibold uppercase tracking-widest text-text-dim items-center">
-          <span className="cursor-pointer hover:text-white transition-colors">Discovery</span>
           <span className="cursor-pointer hover:text-white transition-colors text-white">Collection</span>
-          <span className="cursor-pointer hover:text-white transition-colors">About</span>
         </div>
         <div className="text-[11px] font-mono text-text-dim tabular-nums">USER_2026</div>
       </nav>
@@ -242,27 +294,81 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto pt-4 space-y-0.5">
-                {playlist.map((track, index) => (
-                  <button
-                    key={track.id}
-                    onClick={() => playTrack(index)}
-                    className={`w-full flex items-center gap-4 px-6 py-3 transition-all relative group ${
-                      currentTrackIndex === index ? 'bg-white/10 border-l-4 border-accent' : 'hover:bg-white/5 border-l-4 border-transparent'
-                    }`}
-                  >
-                    <div className="w-10 h-10 bg-black/40 rounded shrink-0 overflow-hidden border border-white/5">
-                      <img src={track.cover} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className={`text-sm font-medium truncate ${currentTrackIndex === index ? 'text-accent' : 'text-text-main opacity-80 group-hover:opacity-100'}`}>
-                        {track.title}
+              <div className="flex-1 overflow-y-auto pt-2 space-y-1">
+                {folders.map((folder) => {
+                  const isExpanded = expandedFolders.has(folder.id);
+                  return (
+                    <div key={folder.id} className="space-y-0.5">
+                      {/* Folder Header */}
+                      <div className="group flex items-center gap-2 px-6 py-3 hover:bg-white/5 cursor-pointer">
+                        <div 
+                          className="flex flex-1 items-center gap-2 overflow-hidden"
+                          onClick={() => toggleFolder(folder.id)}
+                        >
+                          <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : 'rotate-0'}`}>
+                            <ChevronRight size={14} className="text-text-dim" />
+                          </div>
+                          <span className="text-[11px] font-bold text-text-dim uppercase tracking-[0.1em] truncate">
+                            {folder.name}
+                          </span>
+                        </div>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); playFolder(folder); }}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 bg-accent text-bg rounded-md transition-all hover:scale-110 active:scale-95 shadow-lg"
+                          title={`Play ${folder.name}`}
+                        >
+                          <Play size={12} fill="currentColor" />
+                        </button>
                       </div>
-                      <div className="text-xs text-text-dim truncate">{track.artist}</div>
+
+                      {/* Folder Tracks */}
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden bg-black/10"
+                          >
+                            {folder.tracks.map((track) => {
+                              const isActive = currentTrack.id === track.id && currentPlaylist.some(t => t.id === track.id);
+                              return (
+                                <button
+                                  key={track.id}
+                                  onClick={() => playTrack(track, folder.tracks)}
+                                  className={`w-full flex items-center gap-4 px-8 py-3 transition-all relative group ${
+                                    isActive ? 'bg-white/10 border-l-4 border-accent' : 'hover:bg-white/5 border-l-4 border-transparent'
+                                  }`}
+                                >
+                                  <div className="w-9 h-9 bg-black/40 rounded shrink-0 overflow-hidden border border-white/5 relative">
+                                    <img src={track.cover} alt="" className="w-full h-full object-cover" />
+                                    {isActive && isPlaying && (
+                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                        <div className="flex gap-0.5 items-end h-3">
+                                          <motion.div animate={{ height: [3, 8, 4, 7, 3] }} transition={{ repeat: Infinity, duration: 1 }} className="w-0.5 bg-white" />
+                                          <motion.div animate={{ height: [5, 3, 9, 4, 5] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-0.5 bg-white" />
+                                          <motion.div animate={{ height: [4, 7, 3, 9, 4] }} transition={{ repeat: Infinity, duration: 1.2 }} className="w-0.5 bg-white" />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 text-left">
+                                    <div className={`text-sm font-medium truncate ${isActive ? 'text-accent' : 'text-text-main opacity-80 group-hover:opacity-100'}`}>
+                                      {track.title}
+                                    </div>
+                                    <div className="text-[10px] text-text-dim truncate">{track.artist}</div>
+                                  </div>
+                                  <div className="text-[10px] text-text-dim tabular-nums group-hover:hidden">{track.duration}</div>
+                                  <div className="hidden group-hover:block"><Play size={10} className="text-accent" /></div>
+                                </button>
+                              );
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                    <div className="text-[11px] text-text-dim tabular-nums">{track.duration}</div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </motion.aside>
           )}
@@ -306,6 +412,31 @@ export default function App() {
               <p className="text-base text-text-dim uppercase tracking-[0.2em]">{currentTrack.artist} — Album</p>
             </div>
           </div>
+
+          {/* Lyrics Overlay */}
+          <AnimatePresence>
+            {showLyrics && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="absolute inset-0 z-30 bg-bg/80 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center"
+              >
+                <button 
+                  onClick={() => setShowLyrics(false)}
+                  className="absolute top-8 right-8 text-text-dim hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+                <div className="w-full max-w-xl overflow-y-auto max-h-[70vh] px-4 py-8 space-y-6 flex flex-col items-center">
+                  <h3 className="text-sm font-bold uppercase tracking-[0.3em] text-accent/60 mb-4 italic">Lyrics</h3>
+                  <div className="text-xl md:text-3xl font-light leading-relaxed text-white whitespace-pre-line tracking-wide">
+                    {currentTrack.lyrics || "No lyrics available for this track."}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
       </div>
 
@@ -356,6 +487,13 @@ export default function App() {
         {/* Secondary Controls & Volume */}
         <div className="flex items-center gap-6 shrink-0">
           <div className="flex gap-4 text-text-dim mr-4 border-r border-border-dim pr-6">
+            <button 
+              onClick={() => setShowLyrics(!showLyrics)}
+              className={showLyrics ? 'text-accent' : 'hover:text-white'}
+              title="Lyrics"
+            >
+              <Music2 size={18} />
+            </button>
             <button 
               onClick={() => setIsShuffle(!isShuffle)}
               className={isShuffle ? 'text-accent' : 'hover:text-white'}
@@ -425,6 +563,10 @@ export default function App() {
                 <div className="space-y-1.5">
                   <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Cover URL (Optional)</label>
                   <input name="cover" className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="Direct link to image" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Lyrics (Optional)</label>
+                  <textarea name="lyrics" rows={3} className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm resize-none" placeholder="Enter song lyrics..." />
                 </div>
                 <button type="submit" className="w-full py-3 bg-accent text-bg font-bold rounded uppercase tracking-[0.15em] text-xs hover:bg-gray-200 transition-colors mt-2">
                   Confirm Addition
