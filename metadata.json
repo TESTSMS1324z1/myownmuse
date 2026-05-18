@@ -1,0 +1,6 @@
+{
+  "name": "Muse - 私人線上音樂播放器",
+  "description": "一個簡約、高級、感性且沉浸的私人音樂播放空間。專為存放和播放個人音樂收藏而設計，支持自定義歌單與高級氛圍感交互。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

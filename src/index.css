@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-bg: #0a0a0a;
+  --color-surface: #121212;
+  --color-border-dim: #222222;
+  --color-accent: #ffffff;
+  --color-text-main: #e0e0e0;
+  --color-text-dim: #808080;
+}
+
+:root {
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-dim);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dim);
+}
+
+/* Glassmorphism Classes - Adapted for Sophisticated Dark */
+.glass {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-dim);
+}
+
+.glass-active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Animations */
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-rotate {
+  animation: rotate 20s linear infinite;
+}
+
+.pause-animation {
+  animation-play-state: paused;
+}
+
+/* Range Input Styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--color-border-dim);
+  height: 4px;
+  border-radius: 2px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 12px;
+  width: 12px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  margin-top: -4px;
+  transition: transform 0.2s;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
