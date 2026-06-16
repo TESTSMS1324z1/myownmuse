@@ -85,6 +85,15 @@ const INITIAL_PLAYLIST: Track[] = [
     url: "https://ldosa9402.github.io/hooyeah123.github.io/music/Beauty_And_A_Beat.m4a",
     duration: "03:48",
     lyrics: "none"
+  },
+    {
+    id: 4,
+    title: "吹夢到西洲",
+    artist: "戀戀故人難,黃詩扶,妖揚",
+    cover: "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/6a/c2/82/6ac28205-d19f-6fb6-ced1-1d946ad8c16f/8445281384357.jpg/592x592bb.webp",
+    url: "https://ldosa9402.github.io/hooyeah123.github.io/music/吹夢到西洲.m4a",
+    duration: "05:15",
+    lyrics: "none"
   }
 ];
 
@@ -132,7 +141,7 @@ export default function App() {
   };
 
   // Handle Playback
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
@@ -141,18 +150,18 @@ export default function App() {
       }
       setIsPlaying(!isPlaying);
     }
-  };
+  }, [isPlaying]);
 
-  const playTrack = (track: Track, fromPlaylist: Track[], playlistName: string = 'Playlist') => {
+  const playTrack = useCallback((track: Track, fromPlaylist: Track[], playlistName: string = 'Playlist') => {
     const index = fromPlaylist.findIndex(t => t.id === track.id);
     setCurrentPlaylist(fromPlaylist);
     setCurrentPlaylistName(playlistName);
     setCurrentTrackIndex(index !== -1 ? index : 0);
     setIsPlaying(true);
     setAudioError(null);
-  };
+  }, []);
 
-  const playFolder = (folder: Folder) => {
+  const playFolder = useCallback((folder: Folder) => {
     if (folder.tracks.length > 0) {
       setCurrentPlaylist(folder.tracks);
       setCurrentPlaylistName(folder.name);
@@ -160,7 +169,7 @@ export default function App() {
       setIsPlaying(true);
       setAudioError(null);
     }
-  };
+  }, []);
 
   const addToQueue = (track: Track) => {
     setQueue(prev => [...prev, track]);
@@ -200,11 +209,43 @@ export default function App() {
     setIsPlaying(true);
   }, [currentTrackIndex, isShuffle, currentPlaylist, queue]);
 
-  const prevTrack = () => {
+  const prevTrack = useCallback(() => {
+    if (currentPlaylist.length === 0) return;
     let prevIndex = (currentTrackIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
     setCurrentTrackIndex(prevIndex);
     setIsPlaying(true);
-  };
+  }, [currentTrackIndex, currentPlaylist]);
+
+  // Sync Media Session and Document Title
+  useEffect(() => {
+    if (currentTrack) {
+      const statusIcon = isPlaying ? '▶' : '⏸';
+      document.title = `${statusIcon} ${currentTrack.title} - Muse`;
+      
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new window.MediaMetadata({
+          title: currentTrack.title,
+          artist: currentTrack.artist,
+          album: currentPlaylistName || 'Muse Collection',
+          artwork: [
+            { src: currentTrack.cover, sizes: '96x96', type: 'image/webp' },
+            { src: currentTrack.cover, sizes: '128x128', type: 'image/webp' },
+            { src: currentTrack.cover, sizes: '192x192', type: 'image/webp' },
+            { src: currentTrack.cover, sizes: '256x256', type: 'image/webp' },
+            { src: currentTrack.cover, sizes: '384x384', type: 'image/webp' },
+            { src: currentTrack.cover, sizes: '512x512', type: 'image/webp' },
+          ]
+        });
+
+        navigator.mediaSession.setActionHandler('play', togglePlay);
+        navigator.mediaSession.setActionHandler('pause', togglePlay);
+        navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
+        navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+      }
+    } else {
+      document.title = 'Muse - 私人線上音樂播放器';
+    }
+  }, [currentTrack, isPlaying, nextTrack, togglePlay, prevTrack, currentPlaylistName]);
 
   useEffect(() => {
     if (audioRef.current) {
