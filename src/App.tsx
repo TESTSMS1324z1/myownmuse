@@ -22,7 +22,9 @@ import {
   X,
   Plus,
   ArrowUpRight,
-  Search
+  Search,
+  Copy,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -86,13 +88,22 @@ const INITIAL_PLAYLIST: Track[] = [
     duration: "03:48",
     lyrics: "none"
   },
-    {
+  {
     id: 4,
     title: "吹夢到西洲",
     artist: "戀戀故人難,黃詩扶,妖揚",
     cover: "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/6a/c2/82/6ac28205-d19f-6fb6-ced1-1d946ad8c16f/8445281384357.jpg/592x592bb.webp",
     url: "https://ldosa9402.github.io/hooyeah123.github.io/music/吹夢到西洲.m4a",
     duration: "05:15",
+    lyrics: "none"
+  },
+  {
+    id: 5,
+    title: "娛樂人生",
+    artist: "陳蕾",
+    cover: "https://is1-ssl.mzstatic.com/image/thumb/Music123/v4/4a/0e/bb/4a0ebb26-a9c2-8f7b-df32-46487d203776/190295411046.jpg/592x592bb.webp",
+    url: "https://ldosa9402.github.io/hooyeah123.github.io/music/娛樂人生.m4a",
+    duration: "03:55",
     lyrics: "none"
   }
 ];
@@ -126,6 +137,8 @@ export default function App() {
   const [likedTracks, setLikedTracks] = useState<Set<number>>(new Set());
   const [audioError, setAudioError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -314,23 +327,37 @@ export default function App() {
   const addNewTrack = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const newTrack: Track = {
-      id: Date.now(),
-      title: formData.get('title') as string,
-      artist: formData.get('artist') as string,
-      cover: (formData.get('cover') as string) || "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400",
-      url: formData.get('url') as string,
-      duration: "--:--",
-      lyrics: (formData.get('lyrics') as string) || ""
-    };
-    if (newTrack.title && newTrack.url) {
-      // Add to default folder for now
-      setFolders(prev => {
-        const next = [...prev];
-        next[0].tracks = [...next[0].tracks, newTrack];
-        return next;
-      });
-      setShowAddTrack(false);
+    
+    // Calculate next ID from all tracks in all folders
+    const allTracks = folders.flatMap(f => f.tracks);
+    const maxId = Math.max(...allTracks.map(t => t.id), 0);
+    const nextId = maxId + 1;
+
+    const title = formData.get('title') as string;
+    const artist = formData.get('artist') as string;
+    const cover = (formData.get('cover') as string) || "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=400";
+    const url = formData.get('url') as string;
+    const duration = (formData.get('duration') as string) || "00:00";
+    const lyrics = (formData.get('lyrics') as string) || "none";
+
+    const code = `  {
+    id: ${nextId},
+    title: "${title}",
+    artist: "${artist}",
+    cover: "${cover}",
+    url: "${url}",
+    duration: "${duration}",
+    lyrics: "${lyrics.replace(/\n/g, '\\n')}"
+  },`;
+
+    setGeneratedCode(code);
+  };
+
+  const copyToClipboard = () => {
+    if (generatedCode) {
+      navigator.clipboard.writeText(generatedCode);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
     }
   };
 
@@ -932,37 +959,76 @@ export default function App() {
             <motion.div 
               initial={{ scale: 0.95, y: 10 }}
               animate={{ scale: 1, y: 0 }}
-              className="w-full max-w-md bg-surface border border-border-dim p-8 rounded-lg space-y-6 shadow-2xl"
+              className="w-full max-w-lg bg-surface border border-border-dim p-8 rounded-lg space-y-6 shadow-2xl maxHeight-[90vh] overflow-y-auto"
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium tracking-tight">ADD NEW TRACK</h3>
-                <button onClick={() => setShowAddTrack(false)} className="text-text-dim hover:text-white transition-colors"><X size={20} /></button>
+                <button onClick={() => { setShowAddTrack(false); setGeneratedCode(null); }} className="text-text-dim hover:text-white transition-colors"><X size={20} /></button>
               </div>
-              <form onSubmit={addNewTrack} className="space-y-5">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Track Title</label>
-                  <input name="title" required className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="e.g. Midnight City" />
+
+              {!generatedCode ? (
+                <form onSubmit={addNewTrack} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Track Title</label>
+                    <input name="title" required className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="e.g. Midnight City" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Artist Name</label>
+                    <input name="artist" className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="e.g. M83" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Duration (MM:SS)</label>
+                    <input name="duration" className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="e.g. 02:59" />
+                  </div>
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Audio URL</label>
+                    <input name="url" required className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="Direct link to mp3/wav" />
+                  </div>
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Cover URL (Optional)</label>
+                    <input name="cover" className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="Direct link to image" />
+                  </div>
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Lyrics (Optional)</label>
+                    <textarea name="lyrics" rows={2} className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm resize-none" placeholder="Enter song lyrics..." />
+                  </div>
+                  <button type="submit" className="md:col-span-2 py-3 bg-accent text-bg font-bold rounded uppercase tracking-[0.15em] text-xs hover:bg-gray-200 transition-colors mt-2">
+                    Generate Snippet
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <p className="text-xs text-text-dim">Copy the code below and add it to <code className="text-accent bg-accent/10 px-1 py-0.5 rounded">TRACKS</code> in your source code:</p>
+                    <div className="relative group">
+                      <pre className="w-full bg-black/40 border border-border-dim rounded-lg p-5 text-[11px] font-mono leading-relaxed overflow-x-auto text-white/80">
+                        {generatedCode}
+                      </pre>
+                      <button 
+                        onClick={copyToClipboard}
+                        className="absolute top-3 right-3 p-2 bg-white/10 hover:bg-white/20 rounded-md transition-all text-white flex items-center gap-2 text-[10px] uppercase tracking-wider"
+                      >
+                        {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                        {isCopied ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <button 
+                      onClick={() => setGeneratedCode(null)}
+                      className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded uppercase tracking-[0.15em] text-xs transition-colors"
+                    >
+                      Back to Edit
+                    </button>
+                    <button 
+                      onClick={() => { setShowAddTrack(false); setGeneratedCode(null); }}
+                      className="flex-1 py-3 bg-accent text-bg font-bold rounded uppercase tracking-[0.15em] text-xs hover:bg-gray-200 transition-colors"
+                    >
+                      Done
+                    </button>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Artist Name</label>
-                  <input name="artist" className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="e.g. M83" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Audio URL</label>
-                  <input name="url" required className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="Direct link to mp3/wav" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Cover URL (Optional)</label>
-                  <input name="cover" className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm" placeholder="Direct link to image" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Lyrics (Optional)</label>
-                  <textarea name="lyrics" rows={3} className="w-full bg-bg border border-border-dim rounded px-4 py-2.5 outline-none focus:border-text-dim transition-colors text-sm resize-none" placeholder="Enter song lyrics..." />
-                </div>
-                <button type="submit" className="w-full py-3 bg-accent text-bg font-bold rounded uppercase tracking-[0.15em] text-xs hover:bg-gray-200 transition-colors mt-2">
-                  Confirm Addition
-                </button>
-              </form>
+              )}
             </motion.div>
           </motion.div>
         )}
