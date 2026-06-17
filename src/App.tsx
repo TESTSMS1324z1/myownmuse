@@ -250,13 +250,30 @@ export default function App() {
           ]
         });
 
+        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
         navigator.mediaSession.setActionHandler('play', togglePlay);
         navigator.mediaSession.setActionHandler('pause', togglePlay);
         navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
         navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+        
+        // Add seek handlers for lock screen scrubber support
+        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+          if (audioRef.current) {
+            audioRef.current.currentTime = Math.max(audioRef.current.currentTime - (details.seekOffset || 10), 0);
+          }
+        });
+        navigator.mediaSession.setActionHandler('seekforward', (details) => {
+          if (audioRef.current) {
+            audioRef.current.currentTime = Math.min(audioRef.current.currentTime + (details.seekOffset || 10), audioRef.current.duration);
+          }
+        });
       }
     } else {
       document.title = 'Muse - 私人線上音樂播放器';
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'none';
+      }
     }
   }, [currentTrack, isPlaying, nextTrack, togglePlay, prevTrack, currentPlaylistName]);
 
@@ -268,12 +285,25 @@ export default function App() {
 
   useEffect(() => {
     if (audioRef.current && currentTrack) {
-      audioRef.current.load();
+      const audio = audioRef.current;
+      
+      // On mobile, explicit load helps with background transition
+      audio.load();
+      
       if (isPlaying) {
-        audioRef.current.play().catch(() => setIsPlaying(false));
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Autoplay/Background playback blocked:", error);
+            // If play fails due to a user interaction requirement, we might need to reset state
+            if (error.name === 'NotAllowedError') {
+              setIsPlaying(false);
+            }
+          });
+        }
       }
     }
-  }, [currentTrack?.url]);
+  }, [currentTrack?.url, currentTrack?.id]); // Added id to dependency to ensure re-play on same URL if needed
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -285,6 +315,19 @@ export default function App() {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
       if (!duration) setDuration(audioRef.current.duration);
+      
+      // Update media session position state for the lock screen seek bar
+      if ('mediaSession' in navigator && 'getPositionState' in navigator.mediaSession) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: audioRef.current.duration || 0,
+            playbackRate: audioRef.current.playbackRate,
+            position: audioRef.current.currentTime
+          });
+        } catch (e) {
+          // Ignore potential errors if duration is NaN or Infinity initially
+        }
+      }
     }
   };
 
