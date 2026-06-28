@@ -105,6 +105,15 @@ const INITIAL_PLAYLIST: Track[] = [
     url: "https://ldosa9402.github.io/hooyeah123.github.io/music/娛樂人生.m4a",
     duration: "03:55",
     lyrics: "none"
+  },
+  {
+    id: 6,
+    title: "玻璃",
+    artist: "Gareth.T",
+    cover: "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/1c/1a/be/1c1abe3a-2eb6-216c-9040-797bb98464d1/827568024145.jpg/600x600bb.webp",
+    url: "https://ldosa9402.github.io/hooyeah123.github.io/music/玻璃.m4a",
+    duration: "03:05",
+    lyrics: "none"
   }
 ];
 
