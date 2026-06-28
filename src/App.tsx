@@ -287,23 +287,35 @@ export default function App() {
     if (audioRef.current && currentTrack) {
       const audio = audioRef.current;
       
+      const playWithRetry = async (retries = 3) => {
+        try {
+          await audio.play();
+          setIsPlaying(true);
+          setAudioError(null);
+        } catch (error: any) {
+          console.error(`Playback failed (Remaining retries: ${retries}):`, error);
+          if (error.name === 'NotAllowedError') {
+            setIsPlaying(false);
+            return;
+          }
+          if (retries > 0 && isPlaying) {
+            // Wait a bit before retrying background play
+            setTimeout(() => playWithRetry(retries - 1), 1000);
+          } else if (isPlaying) {
+            setAudioError("Playback issue encountered. Skipping track...");
+            setTimeout(nextTrack, 2000);
+          }
+        }
+      };
+
       // On mobile, explicit load helps with background transition
       audio.load();
       
       if (isPlaying) {
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error("Autoplay/Background playback blocked:", error);
-            // If play fails due to a user interaction requirement, we might need to reset state
-            if (error.name === 'NotAllowedError') {
-              setIsPlaying(false);
-            }
-          });
-        }
+        playWithRetry();
       }
     }
-  }, [currentTrack?.url, currentTrack?.id]); // Added id to dependency to ensure re-play on same URL if needed
+  }, [currentTrack?.url, currentTrack?.id, nextTrack]);
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -408,16 +420,19 @@ export default function App() {
     <div className="flex flex-col h-screen w-full bg-bg text-text-main selection:bg-white/10">
       {currentTrack && (
         <audio
-          key={currentTrack.url}
           ref={audioRef}
           src={encodeURI(currentTrack.url)}
           crossOrigin="anonymous"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={handleEnded}
+          preload="auto"
           onError={() => {
-            setIsPlaying(false);
-            setAudioError("The audio file could not be loaded. Please check the URL.");
+            console.error("Audio error event triggered");
+            setAudioError("The audio file could not be loaded. Attempting recovery...");
+            if (isPlaying) {
+              setTimeout(nextTrack, 3000);
+            }
           }}
         />
       )}
